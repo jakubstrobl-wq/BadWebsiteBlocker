@@ -1,0 +1,15 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.user.json
+TestResults/
+
+## Published output
+publish/
+
+## Local data
+*.db
+*.log

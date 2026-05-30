@@ -1,0 +1,31 @@
+# Social media domains blocked by BadWebsiteBlocker
+# Add or remove domains before installation
+facebook.com
+instagram.com
+twitter.com
+x.com
+tiktok.com
+reddit.com
+youtube.com
+snapchat.com
+pinterest.com
+tumblr.com
+discord.com
+twitch.tv
+linkedin.com
+whatsapp.com
+telegram.org
+t.me
+threads.net
+bereal.com
+vk.com
+weibo.com
+9gag.com
+ifunny.co
+imgur.com
+mastodon.social
+bluesky.app
+bsky.app
+lemon8-app.com
+triller.co
+clubhouse.com
