@@ -33,13 +33,28 @@ if (Config.IsInstalled())
     return 0;
 }
 
-// Ask about social media
+// Ask about social media categories
 Console.WriteLine();
 Console.ForegroundColor = ConsoleColor.White;
-Console.Write("Block social media (Facebook, Instagram, TikTok, YouTube, etc.)? [y/N]: ");
+Console.WriteLine("Choose social media categories to block:");
 Console.ResetColor();
-var input = Console.ReadLine()?.Trim().ToLowerInvariant();
-var blockSocial = input is "y" or "yes";
+Console.WriteLine("  [1] Very harmful   - Instagram, TikTok, Facebook, Snapchat, Twitter/X, BeReal, Threads (+2 more)");
+Console.WriteLine("  [2] Feeds & forums - Reddit, Tumblr, Pinterest, Imgur, 9gag, LinkedIn (+6 more)");
+Console.WriteLine("  [3] Streaming      - Twitch");
+Console.WriteLine("  [4] YouTube        - youtube.com");
+Console.WriteLine("  [5] Messaging      - Discord, Telegram, WhatsApp");
+Console.WriteLine();
+Console.Write("Enter numbers to block (e.g. 1,3,4), or press Enter to skip all: ");
+var input = Console.ReadLine()?.Trim() ?? "";
+var chosen = input.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                  .Select(s => s.Trim())
+                  .ToHashSet();
+var social = new SocialCategories(
+    Harmful:     chosen.Contains("1"),
+    FeedsForums: chosen.Contains("2"),
+    Streaming:   chosen.Contains("3"),
+    YouTube:     chosen.Contains("4"),
+    Messaging:   chosen.Contains("5"));
 
 Console.WriteLine();
 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -56,7 +71,7 @@ if (confirm != "CONFIRM")
 
 Console.WriteLine();
 Step("Downloading domain blocklists...");
-await DownloadBlocklists(blockSocial);
+await DownloadBlocklists(social);
 
 Step("Copying service binaries...");
 var installDir = Path.Combine(
@@ -82,8 +97,8 @@ Step("Writing blocked domains to hosts file...");
 var blocklist = new BlocklistManager();
 blocklist.LoadFromFile(Path.Combine(Config.DataDir, "lists", "adult.txt"));
 blocklist.MergeFromFile(Path.Combine(Config.DataDir, "lists", "gambling.txt"));
-if (blockSocial)
-    blocklist.MergeFromFile(Path.Combine(Config.DataDir, "lists", "social.txt"));
+foreach (var file in social.EnabledFileNames())
+    blocklist.MergeFromFile(Path.Combine(Config.DataDir, "lists", file));
 blocklist.MergeFromLines(BlocklistManager.DohBypassDomains.Select(d => $"0.0.0.0 {d}"));
 var hostsManager = new HostsFileManager(blocklist);
 hostsManager.WriteHosts();
@@ -95,7 +110,7 @@ Step("Locking installation directory permissions...");
 LockInstallDir(installDir);
 
 Step("Saving configuration...");
-Config.WriteInstallConfig(blockSocial);
+Config.WriteInstallConfig(social);
 
 Step("Starting services...");
 Run("sc", "start BadBlockerService");
@@ -107,7 +122,16 @@ Console.ForegroundColor = ConsoleColor.Green;
 Console.WriteLine("Installation complete!");
 Console.WriteLine($"Blocking {blocklist.Count:N0} domains.");
 Console.WriteLine("Your computer will now block adult and gambling sites.");
-if (blockSocial) Console.WriteLine("Social media is also blocked.");
+if (social.AnyEnabled)
+{
+    var cats = new List<string>();
+    if (social.Harmful)     cats.Add("very harmful social media");
+    if (social.FeedsForums) cats.Add("feeds & forums");
+    if (social.Streaming)   cats.Add("streaming");
+    if (social.YouTube)     cats.Add("YouTube");
+    if (social.Messaging)   cats.Add("messaging apps");
+    Console.WriteLine($"Also blocking: {string.Join(", ", cats)}.");
+}
 Console.ResetColor();
 Console.WriteLine("\nPress any key to exit.");
 Console.ReadKey();
@@ -125,12 +149,12 @@ static void Step(string msg)
 
 static bool IsAdmin()
 {
-    using var identity  = WindowsIdentity.GetCurrent();
+    using var identity = WindowsIdentity.GetCurrent();
     var principal = new WindowsPrincipal(identity);
     return principal.IsInRole(WindowsBuiltInRole.Administrator);
 }
 
-static async Task DownloadBlocklists(bool blockSocial)
+static async Task DownloadBlocklists(SocialCategories social)
 {
     var listsDir = Path.Combine(Config.DataDir, "lists");
     Directory.CreateDirectory(listsDir);
@@ -147,11 +171,19 @@ static async Task DownloadBlocklists(bool blockSocial)
         "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts",
         Path.Combine(listsDir, "gambling.txt"));
 
-    if (blockSocial)
+    // Copy bundled social category files from installer directory
+    var srcDir = Path.Combine(AppContext.BaseDirectory, "lists");
+    foreach (var file in social.EnabledFileNames())
     {
-        var socialSrc = Path.Combine(AppContext.BaseDirectory, "lists", "social.txt");
-        if (File.Exists(socialSrc))
-            File.Copy(socialSrc, Path.Combine(listsDir, "social.txt"), overwrite: true);
+        var src = Path.Combine(srcDir, file);
+        if (File.Exists(src))
+            File.Copy(src, Path.Combine(listsDir, file), overwrite: true);
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"     WARNING: Missing bundled list file: {file}");
+            Console.ResetColor();
+        }
     }
 }
 
@@ -162,14 +194,13 @@ static async Task DownloadList(HttpClient http, string url, string dest)
         Console.WriteLine($"     Downloading {Path.GetFileName(dest)}...");
         var content = await http.GetStringAsync(url);
         await File.WriteAllTextAsync(dest, content);
-        Console.WriteLine($"     OK — {content.Split('\n').Length:N0} lines");
+        Console.WriteLine($"     OK - {content.Split('\n').Length:N0} lines");
     }
     catch (Exception ex)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"     WARNING: Could not download {Path.GetFileName(dest)}: {ex.Message}");
         Console.ResetColor();
-        // Create empty file so service doesn't fail to load
         if (!File.Exists(dest)) await File.WriteAllTextAsync(dest, "# download failed\n");
     }
 }
@@ -183,21 +214,17 @@ static void CopyBinaries(string destDir)
         var src = Path.Combine(baseDir, exe);
         if (File.Exists(src))
             File.Copy(src, Path.Combine(destDir, exe), overwrite: true);
-        // Also copy supporting DLLs (same base directory)
     }
-    // Copy all .dll and .json files from base directory
     foreach (var file in Directory.GetFiles(baseDir, "*.dll")
         .Concat(Directory.GetFiles(baseDir, "*.json"))
         .Concat(Directory.GetFiles(baseDir, "*.runtimeconfig.json")))
     {
-        var dest = Path.Combine(destDir, Path.GetFileName(file));
-        File.Copy(file, dest, overwrite: true);
+        File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite: true);
     }
 }
 
 static void InstallService(string name, string displayName, string binPath)
 {
-    // Delete if exists
     Run("sc", $"stop {name}");
     Run("sc", $"delete {name}");
     Thread.Sleep(500);
@@ -207,19 +234,17 @@ static void InstallService(string name, string displayName, string binPath)
 
 static void SetServiceRecovery(string name)
 {
-    // reset=86400: failure count resets only after 24h of clean uptime, so escalation actually fires
+    // reset=86400: failure count resets only after 24h of clean uptime so escalation actually fires
     Run("sc", $"failure {name} reset= 86400 actions= restart/0/restart/0/reboot/0");
-    // Also set failure flag so recovery kicks in even after successful starts
     Run("sc", $"failureflag {name} 1");
 }
 
 static void SetDnsToLocalhost()
 {
-    // Set DNS for all active network adapters to 127.0.0.1
     Run("powershell", "-NoProfile -Command \"" +
         "Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | " +
         "ForEach-Object { Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex " +
-        "-ServerAddresses '127.0.0.1','127.0.0.1' }\"");
+        "-ServerAddresses '127.0.0.1' }\"");
 }
 
 static void LockInstallDir(string dir)
@@ -237,7 +262,6 @@ static void LockInstallDir(string dir)
         acl.AddAccessRule(new FileSystemAccessRule(trustedInstaller,
             FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
             PropagationFlags.None, AccessControlType.Allow));
-        // Admins and users get read+execute only
         var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
         acl.AddAccessRule(new FileSystemAccessRule(admins,
             FileSystemRights.ReadAndExecute, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
@@ -258,12 +282,12 @@ static void Run(string exe, string args)
     {
         using var p = Process.Start(new ProcessStartInfo(exe, args)
         {
-            UseShellExecute = false,
-            CreateNoWindow  = true,
+            UseShellExecute        = false,
+            CreateNoWindow         = true,
             RedirectStandardOutput = true,
             RedirectStandardError  = true
         })!;
         p.WaitForExit(15_000);
     }
-    catch { /* best effort */ }
+    catch { }
 }

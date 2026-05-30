@@ -60,8 +60,10 @@ public sealed class Worker : BackgroundService
         var dir = Config.DataDir;
         mgr.LoadFromFile(Path.Combine(dir, "lists", "adult.txt"));
         mgr.MergeFromFile(Path.Combine(dir, "lists", "gambling.txt"));
-        if (Config.GetBlockSocial())
-            mgr.MergeFromFile(Path.Combine(dir, "lists", "social.txt"));
+
+        foreach (var file in Config.GetSocialCategories().EnabledFileNames())
+            mgr.MergeFromFile(Path.Combine(dir, "lists", file));
+
         // Always block DNS-over-HTTPS provider domains so browsers can't bypass the sinkhole
         mgr.MergeFromLines(BlocklistManager.DohBypassDomains.Select(d => $"0.0.0.0 {d}"));
         return mgr;

@@ -1,0 +1,14 @@
+# Feeds & forums — content aggregators, image boards, niche social networks
+reddit.com
+pinterest.com
+tumblr.com
+9gag.com
+ifunny.co
+imgur.com
+mastodon.social
+bluesky.app
+bsky.app
+linkedin.com
+vk.com
+weibo.com
+clubhouse.com

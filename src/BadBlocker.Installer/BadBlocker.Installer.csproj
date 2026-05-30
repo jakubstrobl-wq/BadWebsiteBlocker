@@ -4,6 +4,14 @@
     <ProjectReference Include="..\BadBlocker.Core\BadBlocker.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\lists\social_harmful.txt"   Link="lists\social_harmful.txt"   CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\lists\social_feeds.txt"     Link="lists\social_feeds.txt"     CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\lists\social_streaming.txt" Link="lists\social_streaming.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\lists\social_youtube.txt"   Link="lists\social_youtube.txt"   CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\lists\social_messaging.txt" Link="lists\social_messaging.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
