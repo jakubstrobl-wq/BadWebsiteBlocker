@@ -46,15 +46,22 @@ public static class Config
 
     public static SocialCategories GetSocialCategories()
     {
-        using var key = Registry.LocalMachine.OpenSubKey(RegPath);
-        static bool Read(RegistryKey? k, string name) =>
-            k?.GetValue(name) is int v && v == 1;
-        return new SocialCategories(
-            Harmful:    Read(key, "BlockHarmful"),
-            FeedsForums:Read(key, "BlockFeedsForums"),
-            Streaming:  Read(key, "BlockStreaming"),
-            YouTube:    Read(key, "BlockYouTube"),
-            Messaging:  Read(key, "BlockMessaging"));
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(RegPath);
+            static bool Read(RegistryKey? k, string name) =>
+                k?.GetValue(name) is int v && v == 1;
+            return new SocialCategories(
+                Harmful:    Read(key, "BlockHarmful"),
+                FeedsForums:Read(key, "BlockFeedsForums"),
+                Streaming:  Read(key, "BlockStreaming"),
+                YouTube:    Read(key, "BlockYouTube"),
+                Messaging:  Read(key, "BlockMessaging"));
+        }
+        catch (System.Security.SecurityException)
+        {
+            return new SocialCategories(false, false, false, false, false);
+        }
     }
 
     public static bool IsInstalled()
