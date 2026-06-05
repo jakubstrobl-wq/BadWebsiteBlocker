@@ -59,8 +59,15 @@ public static class Config
 
     public static bool IsInstalled()
     {
-        using var key = Registry.LocalMachine.OpenSubKey(RegPath);
-        return key?.GetValue("Installed") is int v && v == 1;
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(RegPath);
+            return key?.GetValue("Installed") is int v && v == 1;
+        }
+        catch (System.Security.SecurityException)
+        {
+            return true; // key is locked to SYSTEM — software is installed
+        }
     }
 
     private static void LockRegistryKey()
