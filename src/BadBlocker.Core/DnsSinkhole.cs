@@ -10,6 +10,7 @@ public sealed class DnsSinkhole : IDisposable
     private readonly IPEndPoint _upstream = new(IPAddress.Parse("1.1.1.1"), 53);
     private readonly int _port;
     private UdpClient? _server;
+    private UdpClient? _serverV6;
     private CancellationTokenSource? _cts;
 
     public DnsSinkhole(BlocklistManager blocklist, int port = 53)
@@ -22,36 +23,41 @@ public sealed class DnsSinkhole : IDisposable
     {
         _cts = new CancellationTokenSource();
         _server = new UdpClient(new IPEndPoint(IPAddress.Loopback, _port));
-        Task.Run(() => RunLoop(_cts.Token));
+        Task.Run(() => RunLoop(_server, _cts.Token));
+
+        try
+        {
+            _serverV6 = new UdpClient(new IPEndPoint(IPAddress.IPv6Loopback, _port));
+            Task.Run(() => RunLoop(_serverV6, _cts.Token));
+        }
+        catch { /* IPv6 not available on this machine */ }
     }
 
     public void Stop()
     {
         _cts?.Cancel();
-        _server?.Close();
-        _server = null;
+        _server?.Close();  _server  = null;
+        _serverV6?.Close(); _serverV6 = null;
     }
 
     public void Dispose() => Stop();
 
-    private async Task RunLoop(CancellationToken ct)
+    private async Task RunLoop(UdpClient server, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                var result = await _server!.ReceiveAsync(ct);
-                _ = Task.Run(() => HandleQuery(result.Buffer, result.RemoteEndPoint), ct);
+                var result = await server.ReceiveAsync(ct);
+                _ = Task.Run(() => HandleQuery(server, result.Buffer, result.RemoteEndPoint), ct);
             }
             catch (OperationCanceledException) { break; }
             catch { await Task.Delay(100, ct).ConfigureAwait(false); }
         }
     }
 
-    private async Task HandleQuery(byte[] data, IPEndPoint client)
+    private async Task HandleQuery(UdpClient server, byte[] data, IPEndPoint client)
     {
-        // Capture server reference once; avoids null-race with Stop() and serialises nothing
-        var server = _server;
         if (server == null) return;
         try
         {

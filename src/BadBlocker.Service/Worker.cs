@@ -85,12 +85,14 @@ public sealed class Worker : BackgroundService
                 // Fire-and-forget: do not block the service loop waiting for netsh
                 var ifaceName = iface.Name;
                 _ = Task.Run(() =>
+                {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                        "netsh",
-                        $"interface ip set dns \"{ifaceName}\" static {sinkhole} primary")
-                    {
-                        UseShellExecute = false, CreateNoWindow = true
-                    })?.WaitForExit(5000));
+                        "netsh", $"interface ip set dns \"{ifaceName}\" static {sinkhole} primary")
+                    { UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                        "netsh", $"interface ipv6 set dnsservers \"{ifaceName}\" static ::1 primary")
+                    { UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
+                });
             }
         }
     }

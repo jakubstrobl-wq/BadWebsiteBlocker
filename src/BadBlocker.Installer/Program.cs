@@ -243,8 +243,10 @@ static void SetDnsToLocalhost()
 {
     Run("powershell", "-NoProfile -Command \"" +
         "Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | " +
-        "ForEach-Object { Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex " +
-        "-ServerAddresses '127.0.0.1' }\"");
+        "ForEach-Object { " +
+        "Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -ServerAddresses '127.0.0.1'; " +
+        "netsh interface ipv6 set dnsservers name=$($_.InterfaceIndex) static '::1' primary | Out-Null " +
+        "}\"");
 }
 
 static void LockInstallDir(string dir)

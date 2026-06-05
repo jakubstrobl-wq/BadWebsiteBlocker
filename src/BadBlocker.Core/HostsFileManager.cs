@@ -40,8 +40,10 @@ public sealed class HostsFileManager : IDisposable
             lines.AppendLine(BlockMarkerBegin);
             foreach (var domain in _blocklist.AllDomains)
             {
-                lines.AppendLine($"0.0.0.0 {domain}");
-                lines.AppendLine($"0.0.0.0 www.{domain}");
+                lines.AppendLine($"127.0.0.1 {domain}");
+                lines.AppendLine($"127.0.0.1 www.{domain}");
+                lines.AppendLine($"::1 {domain}");
+                lines.AppendLine($"::1 www.{domain}");
             }
             lines.AppendLine(BlockMarkerEnd);
 
